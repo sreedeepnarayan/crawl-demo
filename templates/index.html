@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crawl4AI + Playwright MCP Demo</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/demo.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-robot text-2xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">MCP Browser Automation</h1>
+                        <p class="text-sm opacity-90">Powered by Playwright MCP + Crawl4AI</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="status-indicator" class="flex items-center space-x-2">
+                        <div class="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                        <span class="text-sm">System Ready</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- Main Demo Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <!-- Control Panel -->
+            <div class="lg:col-span-1">
+                <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+                    <h2 class="text-xl font-semibold mb-4 flex items-center">
+                        <i class="fas fa-cogs text-blue-600 mr-2"></i>
+                        Control Panel
+                    </h2>
+                    
+                    <!-- URL Input -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Target URL
+                        </label>
+                        <input 
+                            type="url" 
+                            id="url-input" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder="https://example.com"
+                            value="https://quotes.toscrape.com/"
+                        >
+                    </div>
+
+                    <!-- MCP Extraction Mode -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            MCP Browser Mode
+                        </label>
+                        <select id="extraction-type" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                            <option value="mcp-basic">MCP Standard Extraction</option>
+                            <option value="mcp-interactive">MCP Interactive (Click/Scroll)</option>
+                            <option value="mcp-authenticated">MCP with Authentication</option>
+                            <option value="mcp-multi-page">MCP Multi-Page Workflow</option>
+                        </select>
+                    </div>
+
+                    <!-- AI Instruction (hidden by default) -->
+                    <div id="ai-instruction-section" class="mb-4 hidden">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            AI Instruction
+                        </label>
+                        <textarea 
+                            id="ai-instruction" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            rows="3"
+                            placeholder="Extract all quotes with their authors..."
+                        >Extract all quotes, their authors, and tags from this page.</textarea>
+                    </div>
+
+                    <!-- Authentication Section (hidden by default) -->
+                    <div id="auth-section" class="mb-4 hidden">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-4">
+                            <div class="flex items-center mb-2">
+                                <i class="fas fa-shield-alt text-yellow-600 mr-2"></i>
+                                <h4 class="text-sm font-medium text-yellow-800">Authentication Required</h4>
+                            </div>
+                            <p class="text-xs text-yellow-700">This will login to the site and extract protected content.</p>
+                        </div>
+                        
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    Login URL
+                                </label>
+                                <input 
+                                    type="url" 
+                                    id="login-url" 
+                                    class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="https://example.com/login"
+                                >
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    Target URL (optional)
+                                </label>
+                                <input 
+                                    type="url" 
+                                    id="target-url" 
+                                    class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    placeholder="Leave empty to use login URL"
+                                >
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">
+                                        Username
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="auth-username" 
+                                        class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="username"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">
+                                        Password
+                                    </label>
+                                    <input 
+                                        type="password" 
+                                        id="auth-password" 
+                                        class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        placeholder="password"
+                                    >
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    Authentication Type
+                                </label>
+                                <select id="auth-type" class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="login_form">Standard Login Form</option>
+                                    <option value="custom_form">Custom Form Selectors</option>
+                                </select>
+                            </div>
+                            
+                            <!-- Custom selectors (hidden by default) -->
+                            <div id="custom-selectors" class="hidden space-y-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">
+                                        Username Field Selector
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="username-selector" 
+                                        class="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="input[name='username']"
+                                        value="input[name='username']"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">
+                                        Password Field Selector
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="password-selector" 
+                                        class="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="input[name='password']"
+                                        value="input[name='password']"
+                                    >
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">
+                                        Submit Button Selector
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        id="submit-selector" 
+                                        class="w-full px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        placeholder="button[type='submit']"
+                                        value="button[type='submit']"
+                                    >
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-xs font-medium text-gray-700 mb-1">
+                                    Extraction Instruction (optional)
+                                </label>
+                                <textarea 
+                                    id="auth-ai-instruction" 
+                                    class="w-full px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                    rows="2"
+                                    placeholder="Extract user profile, dashboard data, etc."
+                                ></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Browser Settings -->
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            Browser Settings
+                        </label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" id="headless-mode" class="mr-2" checked>
+                                <span class="text-sm">Headless Mode (faster)</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="take-screenshots" class="mr-2">
+                                <span class="text-sm">Capture Screenshots</span>
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" id="wait-for-js" class="mr-2" checked>
+                                <span class="text-sm">Wait for JavaScript</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="space-y-3">
+                        <button 
+                            id="mcp-extract-btn" 
+                            class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700 transition duration-300 flex items-center justify-center"
+                        >
+                            <i class="fas fa-robot mr-2"></i>
+                            Start MCP Browser Extraction
+                        </button>
+                        
+                        <button 
+                            id="stop-browser-btn" 
+                            class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 transition duration-300 flex items-center justify-center hidden"
+                        >
+                            <i class="fas fa-stop mr-2"></i>
+                            Stop Browser
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Quick Examples -->
+                <div class="bg-white rounded-lg shadow-md p-6">
+                    <h3 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fas fa-lightning-bolt text-yellow-500 mr-2"></i>
+                        Quick Examples
+                    </h3>
+                    <div class="space-y-2">
+                        <button class="example-url w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm transition duration-200" data-url="https://quotes.toscrape.com/">
+                            📚 Quotes Demo Site
+                        </button>
+                        <button class="example-url w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm transition duration-200" data-url="https://news.ycombinator.com/">
+                            📰 Hacker News
+                        </button>
+                        <button class="example-url w-full text-left px-3 py-2 bg-gray-50 hover:bg-gray-100 rounded text-sm transition duration-200" data-url="https://httpbin.org/html">
+                            🧪 HTTPBin Test Page
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Panel -->
+            <div class="lg:col-span-2">
+                <!-- Loading Indicator -->
+                <div id="loading" class="hidden bg-white rounded-lg shadow-md p-6 mb-6">
+                    <div class="flex items-center justify-center space-x-3">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                        <span class="text-lg">Processing...</span>
+                    </div>
+                </div>
+
+                <!-- Results Container -->
+                <div id="results-container" class="hidden">
+                    <!-- Summary Card -->
+                    <div id="summary-card" class="bg-white rounded-lg shadow-md p-6 mb-6">
+                        <h3 class="text-lg font-semibold mb-3 flex items-center">
+                            <i class="fas fa-chart-bar text-green-600 mr-2"></i>
+                            Extraction Summary
+                        </h3>
+                        <div id="summary-content" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <!-- Summary stats will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Tabs for different views -->
+                    <div class="bg-white rounded-lg shadow-md">
+                        <div class="border-b border-gray-200">
+                            <nav class="flex space-x-8 px-6">
+                                <button class="tab-btn active py-4 px-1 border-b-2 border-blue-500 font-medium text-blue-600" data-tab="content">
+                                    <i class="fas fa-file-alt mr-1"></i>
+                                    Content
+                                </button>
+                                <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-tab="structured">
+                                    <i class="fas fa-table mr-1"></i>
+                                    Structured Data
+                                </button>
+                                <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-tab="entities">
+                                    <i class="fas fa-tags mr-1"></i>
+                                    Entities
+                                </button>
+                                <button class="tab-btn py-4 px-1 border-b-2 border-transparent font-medium text-gray-500 hover:text-gray-700" data-tab="mcp">
+                                    <i class="fas fa-cog mr-1"></i>
+                                    MCP Actions
+                                </button>
+                            </nav>
+                        </div>
+
+                        <div class="p-6">
+                            <!-- Content Tab -->
+                            <div id="content-tab" class="tab-content">
+                                <div id="extracted-content" class="prose max-w-none">
+                                    <p class="text-gray-500 text-center py-8">No content extracted yet. Try extracting from a URL!</p>
+                                </div>
+                            </div>
+
+                            <!-- Structured Data Tab -->
+                            <div id="structured-tab" class="tab-content hidden">
+                                <div id="structured-data">
+                                    <p class="text-gray-500 text-center py-8">No structured data available.</p>
+                                </div>
+                            </div>
+
+                            <!-- Entities Tab -->
+                            <div id="entities-tab" class="tab-content hidden">
+                                <div id="entities-content">
+                                    <p class="text-gray-500 text-center py-8">No entities extracted yet.</p>
+                                </div>
+                            </div>
+
+                            <!-- MCP Actions Tab -->
+                            <div id="mcp-tab" class="tab-content hidden">
+                                <div id="mcp-actions">
+                                    <p class="text-gray-500 text-center py-8">No MCP actions recorded yet.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- History Panel -->
+                <div class="bg-white rounded-lg shadow-md p-6 mt-6">
+                    <h3 class="text-lg font-semibold mb-3 flex items-center">
+                        <i class="fas fa-history text-gray-600 mr-2"></i>
+                        Recent Activity
+                    </h3>
+                    <div id="history-list" class="space-y-2">
+                        <p class="text-gray-500 text-center py-4">No activity yet.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-6 mt-12">
+        <div class="container mx-auto px-6 text-center">
+            <p class="mb-2">Crawl4AI + Playwright MCP Integration Demo</p>
+            <p class="text-sm text-gray-400">
+                Demonstrating complementary use of browser automation and content extraction
+            </p>
+        </div>
+    </footer>
+
+    <script src="{{ url_for('static', filename='js/demo.js') }}"></script>
+</body>
+</html>

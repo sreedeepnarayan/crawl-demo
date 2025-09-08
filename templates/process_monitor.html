@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Process Monitor - Development Processes</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .status-running { color: #10b981; }
+        .status-sleeping { color: #f59e0b; }
+        .status-zombie { color: #ef4444; }
+        .priority-1 { border-left: 4px solid #ef4444; }
+        .priority-2 { border-left: 4px solid #f59e0b; }
+        .priority-3 { border-left: 4px solid #6b7280; }
+        .priority-4 { border-left: 4px solid #10b981; }
+        
+        .category-badge {
+            font-size: 0.75rem;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        
+        .category-playwright-mcp { background-color: #fef2f2; color: #991b1b; }
+        .category-nextjs-dev { background-color: #fff7ed; color: #9a3412; }
+        .category-laravel-dev { background-color: #fffbeb; color: #92400e; }
+        .category-current-demo { background-color: #f0fdf4; color: #166534; }
+        .category-docker { background-color: #eff6ff; color: #1d4ed8; }
+        .category-mysql { background-color: #f3e8ff; color: #7c3aed; }
+        .category-postgresql { background-color: #f0f9ff; color: #0284c7; }
+        .category-vs-code { background-color: #f9fafb; color: #374151; }
+        
+        .refresh-btn { transition: transform 0.2s; }
+        .refresh-btn:hover { transform: rotate(180deg); }
+        
+        .auto-refresh { 
+            animation: pulse 2s infinite;
+            border: 2px solid #10b981;
+        }
+        
+        .tab-btn {
+            border-bottom: 2px solid transparent;
+            color: #6b7280;
+            transition: all 0.3s;
+        }
+        
+        .tab-btn.active {
+            border-bottom-color: #3b82f6;
+            color: #3b82f6;
+        }
+        
+        .tab-btn:hover {
+            color: #3b82f6;
+        }
+        
+        .tab-content.hidden {
+            display: none;
+        }
+        
+        .tab-content.collapsed .collapsible-content {
+            display: none;
+        }
+        
+        .collapse-icon {
+            transition: transform 0.3s;
+        }
+        
+        .collapse-icon.collapsed {
+            transform: rotate(-90deg);
+        }
+        
+        .port-badge {
+            background-color: #dbeafe;
+            color: #1d4ed8;
+            font-size: 0.75rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-red-600 to-orange-600 text-white shadow-lg">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-4">
+                    <i class="fas fa-tasks text-2xl"></i>
+                    <div>
+                        <h1 class="text-2xl font-bold">Process Monitor</h1>
+                        <p class="text-sm opacity-90">Development Process Management</p>
+                    </div>
+                </div>
+                <div id="summary-stats" class="text-right">
+                    <div class="text-sm opacity-90">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container mx-auto px-6 py-8">
+        <!-- Controls -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold">Controls</h2>
+                <div class="flex space-x-3">
+                    <button 
+                        id="auto-refresh-btn" 
+                        class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition duration-300"
+                        onclick="toggleAutoRefresh()"
+                    >
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Auto Refresh: <span id="auto-status">OFF</span>
+                    </button>
+                    <button 
+                        id="refresh-btn" 
+                        class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition duration-300 refresh-btn"
+                        onclick="loadProcesses()"
+                    >
+                        <i class="fas fa-sync-alt mr-2"></i>
+                        Refresh Now
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Quick Actions -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+                <button 
+                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition duration-300"
+                    onclick="killCategory('Playwright MCP')"
+                >
+                    Kill All Playwright MCP
+                </button>
+                <button 
+                    class="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition duration-300"
+                    onclick="killCategory('Next.js Dev')"
+                >
+                    Kill Next.js Dev
+                </button>
+                <button 
+                    class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 transition duration-300"
+                    onclick="killCategory('Laravel Dev')"
+                >
+                    Kill Laravel Dev
+                </button>
+                <button 
+                    class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition duration-300"
+                    onclick="killCategory('Docker')"
+                >
+                    Kill Docker
+                </button>
+            </div>
+        </div>
+
+        <!-- Tabs -->
+        <div class="bg-white rounded-lg shadow-md">
+            <div class="border-b border-gray-200">
+                <nav class="-mb-px flex space-x-8 px-6">
+                    <button 
+                        class="tab-btn py-4 px-1 border-b-2 font-medium text-sm active"
+                        data-tab="ports"
+                        onclick="switchTab('ports')"
+                    >
+                        <i class="fas fa-network-wired mr-2"></i>
+                        Port Mapping
+                    </button>
+                    <button 
+                        class="tab-btn py-4 px-1 border-b-2 font-medium text-sm"
+                        data-tab="processes"
+                        onclick="switchTab('processes')"
+                    >
+                        <i class="fas fa-cogs mr-2"></i>
+                        Processes
+                    </button>
+                    <button 
+                        class="tab-btn py-4 px-1 border-b-2 font-medium text-sm"
+                        data-tab="logs"
+                        onclick="switchTab('logs')"
+                    >
+                        <i class="fas fa-file-alt mr-2"></i>
+                        Logs
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Ports Tab (Now First) -->
+            <div id="tab-ports" class="tab-content">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <button 
+                                onclick="toggleTabCollapse('ports')"
+                                class="collapse-icon text-gray-500 hover:text-gray-700 transition-colors"
+                                title="Collapse/Expand"
+                            >
+                                <i class="fas fa-chevron-down text-lg"></i>
+                            </button>
+                            <div>
+                                <h3 class="text-lg font-semibold">Port Mapping</h3>
+                                <p class="text-sm text-gray-600 mt-1">All listening ports with their processes</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Port Filters and Service Controls -->
+                        <div class="flex space-x-3 items-center">
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm font-medium text-gray-700">Service:</label>
+                                <select id="service-filter" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                                    <option value="">All Services</option>
+                                </select>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm font-medium text-gray-700">Repository:</label>
+                                <select id="repo-filter" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                                    <option value="">All Repositories</option>
+                                </select>
+                            </div>
+                            <div class="border-l border-gray-300 pl-3">
+                                <label class="text-sm font-medium text-gray-700">Quick Start:</label>
+                                <select id="quick-start" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                                    <option value="">Select Service to Start</option>
+                                    <option value="Laravel Dev|atari-agreements">Laravel (atari-agreements)</option>
+                                    <option value="Next.js Dev|portfolio-3d">Next.js (portfolio-3d)</option>
+                                    <option value="Current Demo|crawl-poc">Crawl Demo</option>
+                                    <option value="Python Web|pdf-ocr-tool">PDF OCR Web Server</option>
+                                    <option value="Main Script|pdf-ocr-tool">PDF OCR Main Script</option>
+                                </select>
+                                <button 
+                                    id="start-service-btn" 
+                                    class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition duration-300 ml-2"
+                                    onclick="startSelectedService()"
+                                >
+                                    <i class="fas fa-play mr-1"></i>Start
+                                </button>
+                            </div>
+                            <button 
+                                id="clear-filters-btn" 
+                                class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition duration-300"
+                                onclick="clearPortFilters()"
+                            >
+                                <i class="fas fa-times mr-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="collapsible-content">
+                    <div id="ports-container" class="p-6">
+                        <div class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                            <p class="text-gray-500">Loading port mappings...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Processes Tab (Now Second) -->
+            <div id="tab-processes" class="tab-content hidden">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center space-x-3">
+                        <button 
+                            onclick="toggleTabCollapse('processes')"
+                            class="collapse-icon text-gray-500 hover:text-gray-700 transition-colors"
+                            title="Collapse/Expand"
+                        >
+                            <i class="fas fa-chevron-down text-lg"></i>
+                        </button>
+                        <div>
+                            <h3 class="text-lg font-semibold">Active Development Processes</h3>
+                            <p class="text-sm text-gray-600 mt-1">Sorted by impact priority (high impact first)</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="collapsible-content">
+                    <div id="processes-container" class="p-6">
+                        <div class="text-center py-8">
+                            <i class="fas fa-spinner fa-spin text-2xl text-gray-400 mb-2"></i>
+                            <p class="text-gray-500">Loading processes...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="tab-logs" class="tab-content hidden">
+                <div class="p-6 border-b border-gray-200">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <button 
+                                onclick="toggleTabCollapse('logs')"
+                                class="collapse-icon text-gray-500 hover:text-gray-700 transition-colors"
+                                title="Collapse/Expand"
+                            >
+                                <i class="fas fa-chevron-down text-lg"></i>
+                            </button>
+                            <div>
+                                <h3 class="text-lg font-semibold">Service Logs</h3>
+                                <p class="text-sm text-gray-600 mt-1">Real-time logs for running services</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Log Controls -->
+                        <div class="flex space-x-3 items-center">
+                            <div class="flex items-center space-x-2">
+                                <label class="text-sm font-medium text-gray-700">Service:</label>
+                                <select id="log-service-filter" class="px-3 py-1 border border-gray-300 rounded-md text-sm">
+                                    <option value="">Select Service</option>
+                                </select>
+                            </div>
+                            <button 
+                                id="refresh-logs-btn" 
+                                class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition duration-300"
+                                onclick="refreshLogs()"
+                            >
+                                <i class="fas fa-sync-alt mr-1"></i>Refresh
+                            </button>
+                            <button 
+                                id="clear-logs-btn" 
+                                class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition duration-300"
+                                onclick="clearLogViewer()"
+                            >
+                                <i class="fas fa-trash mr-1"></i>Clear
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="collapsible-content">
+                    <div id="logs-container" class="p-6">
+                        <div class="bg-black text-green-400 p-4 rounded-lg font-mono text-sm min-h-96 max-h-96 overflow-y-auto" id="log-viewer">
+                            <div class="text-center py-8 text-gray-500">
+                                <i class="fas fa-file-alt text-2xl mb-2"></i>
+                                <p>Select a service to view its logs</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="fixed top-4 right-4 space-y-2 z-50"></div>
+
+    <script>
+        let autoRefreshInterval = null;
+        let autoRefreshEnabled = false;
+
+        class ProcessMonitor {
+            constructor() {
+                this.allPorts = []; // Store all ports data for filtering
+                this.init();
+            }
+
+            init() {
+                this.loadPorts(); // Load ports first since it's now the default tab
+                this.setupEventListeners();
+                this.setupLogViewer();
+            }
+
+            setupEventListeners() {
+                // Auto refresh every 5 seconds when enabled
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden && autoRefreshEnabled) {
+                        this.stopAutoRefresh();
+                    } else if (!document.hidden && autoRefreshEnabled) {
+                        this.startAutoRefresh();
+                    }
+                });
+            }
+
+            async loadProcesses() {
+                try {
+                    const response = await fetch('/api/processes');
+                    const data = await response.json();
+                    
+                    this.displaySummary(data.summary);
+                    this.displayProcesses(data.processes);
+                    this.updateTimestamp(data.timestamp);
+                    
+                } catch (error) {
+                    console.error('Failed to load processes:', error);
+                    this.showToast('Failed to load processes', 'error');
+                }
+            }
+
+            displaySummary(summary) {
+                const summaryEl = document.getElementById('summary-stats');
+                summaryEl.innerHTML = `
+                    <div class="text-lg font-bold">${summary.total_processes} Processes</div>
+                    <div class="text-sm opacity-90">
+                        ${summary.high_priority_count} High Impact • 
+                        ${Math.round(summary.total_memory_mb)}MB RAM • 
+                        ${Math.round(summary.total_cpu_percent)}% CPU
+                    </div>
+                `;
+            }
+
+            displayProcesses(processes) {
+                const container = document.getElementById('processes-container');
+                
+                if (processes.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8">
+                            <i class="fas fa-check-circle text-4xl text-green-500 mb-4"></i>
+                            <p class="text-gray-500">No development processes found</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const processesHtml = processes.map(proc => `
+                    <div class="border rounded-lg p-4 mb-3 priority-${proc.priority} hover:shadow-md transition-shadow">
+                        <div class="flex items-start justify-between">
+                            <div class="flex-1">
+                                <div class="flex items-center flex-wrap gap-2 mb-2">
+                                    <span class="category-badge category-${this.slugify(proc.category)}">${proc.category}</span>
+                                    <span class="text-sm text-gray-500">PID: ${proc.pid}</span>
+                                    <span class="text-sm status-${proc.status}">${proc.status}</span>
+                                    <span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">${proc.service}</span>
+                                    <span class="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-medium">${proc.repo}</span>
+                                    ${proc.ports && proc.ports.length > 0 ? 
+                                        proc.ports.map(port => `<span class="port-badge">:${port.port} ${port.name || port.type}</span>`).join('') 
+                                        : ''
+                                    }
+                                </div>
+                                
+                                <h4 class="font-medium text-gray-900 mb-1">${proc.name}</h4>
+                                <p class="text-sm text-gray-600 mb-2" title="${proc.full_cmdline}">${proc.cmdline}</p>
+                                
+                                <div class="flex items-center space-x-4 text-xs text-gray-500">
+                                    <span><i class="fas fa-memory mr-1"></i>${proc.memory_mb} MB</span>
+                                    <span><i class="fas fa-tachometer-alt mr-1"></i>${proc.cpu_percent}% CPU</span>
+                                    <span><i class="fas fa-clock mr-1"></i>Started: ${proc.start_time}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex flex-col items-end space-y-2">
+                                <div class="flex flex-wrap gap-2">
+                                    <button 
+                                        class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition duration-300"
+                                        onclick="stopService('${proc.service}', '${proc.repo}')"
+                                        title="Stop all ${proc.service} processes"
+                                    >
+                                        <i class="fas fa-stop mr-1"></i>Stop
+                                    </button>
+                                    <button 
+                                        class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition duration-300"
+                                        onclick="startService('${proc.service}', '${proc.repo}')"
+                                        title="Start ${proc.service}"
+                                    >
+                                        <i class="fas fa-play mr-1"></i>Start
+                                    </button>
+                                    <button 
+                                        class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition duration-300"
+                                        onclick="viewServiceLogs('${proc.service}', '${proc.repo}')"
+                                        title="View logs for ${proc.service}"
+                                    >
+                                        <i class="fas fa-file-alt mr-1"></i>Logs
+                                    </button>
+                                    <button 
+                                        class="px-3 py-1 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 transition duration-300"
+                                        onclick="restartProcess(${proc.pid}, '${proc.name}')"
+                                        title="Restart this process"
+                                    >
+                                        <i class="fas fa-redo mr-1"></i>Restart
+                                    </button>
+                                    <button 
+                                        class="px-3 py-1 bg-gray-600 text-white text-sm rounded hover:bg-gray-700 transition duration-300"
+                                        onclick="killProcess(${proc.pid}, '${proc.name}')"
+                                        title="Kill this process"
+                                    >
+                                        <i class="fas fa-times mr-1"></i>Kill
+                                    </button>
+                                </div>
+                                
+                                ${proc.priority === 1 ? '<span class="text-xs text-red-600 font-semibold">⚠️ High Impact</span>' : ''}
+                                ${proc.priority === 4 ? '<span class="text-xs text-green-600 font-semibold">✅ Keep Running</span>' : ''}
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                container.innerHTML = processesHtml;
+            }
+
+            async loadPorts() {
+                try {
+                    const response = await fetch('/api/ports');
+                    const data = await response.json();
+                    
+                    this.allPorts = data.ports;
+                    this.setupPortFilters(data.available_services, data.available_repos);
+                    this.applyPortFilters();
+                    
+                } catch (error) {
+                    console.error('Failed to load ports:', error);
+                    this.showToast('Failed to load port mappings', 'error');
+                }
+            }
+
+            setupPortFilters(services, repos) {
+                const serviceFilter = document.getElementById('service-filter');
+                const repoFilter = document.getElementById('repo-filter');
+                
+                // Clear existing options except the first one
+                serviceFilter.innerHTML = '<option value="">All Services</option>';
+                repoFilter.innerHTML = '<option value="">All Repositories</option>';
+                
+                // Add service options
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    option.value = service;
+                    option.textContent = service;
+                    serviceFilter.appendChild(option);
+                });
+                
+                // Add repo options
+                repos.forEach(repo => {
+                    const option = document.createElement('option');
+                    option.value = repo;
+                    option.textContent = repo;
+                    repoFilter.appendChild(option);
+                });
+                
+                // Add event listeners for filtering
+                serviceFilter.addEventListener('change', () => this.applyPortFilters());
+                repoFilter.addEventListener('change', () => this.applyPortFilters());
+            }
+
+            applyPortFilters() {
+                const serviceFilter = document.getElementById('service-filter');
+                const repoFilter = document.getElementById('repo-filter');
+                
+                const selectedService = serviceFilter?.value || '';
+                const selectedRepo = repoFilter?.value || '';
+                
+                let filteredPorts = this.allPorts;
+                
+                if (selectedService) {
+                    filteredPorts = filteredPorts.filter(port => 
+                        port.services.includes(selectedService)
+                    );
+                }
+                
+                if (selectedRepo) {
+                    filteredPorts = filteredPorts.filter(port => 
+                        port.repos.includes(selectedRepo)
+                    );
+                }
+                
+                this.displayPorts(filteredPorts);
+                
+                // Update filter summary
+                const total = this.allPorts.length;
+                const filtered = filteredPorts.length;
+                if (total !== filtered) {
+                    this.showToast(`Showing ${filtered} of ${total} ports`, 'info');
+                }
+            }
+
+            displayPorts(ports) {
+                const container = document.getElementById('ports-container');
+                
+                if (ports.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-8">
+                            <i class="fas fa-network-wired text-4xl text-gray-400 mb-4"></i>
+                            <p class="text-gray-500">No listening ports found</p>
+                        </div>
+                    `;
+                    return;
+                }
+
+                const portsHtml = ports.map(port => {
+                    const multipleProcesses = port.processes.length > 1;
+                    const multipleServices = port.services.length > 1;
+                    const multipleRepos = port.repos.length > 1;
+                    
+                    return `
+                    <div class="border rounded-lg p-4 mb-3 hover:shadow-md transition-shadow ${multipleProcesses ? 'border-orange-300 bg-orange-50' : ''}">
+                        <div class="flex items-start justify-between mb-3">
+                            <div class="flex-1">
+                                <div class="flex items-center flex-wrap gap-2 mb-2">
+                                    <span class="port-badge">:${port.port}</span>
+                                    ${port.name ? `<span class="text-sm font-medium text-green-600">${port.name}</span>` : ''}
+                                    <span class="text-sm text-gray-500">${port.type}</span>
+                                    ${multipleProcesses ? '<span class="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded-full font-semibold">Multiple Processes</span>' : ''}
+                                </div>
+                                
+                                <!-- Services and Repos -->
+                                <div class="flex items-center flex-wrap gap-2">
+                                    ${port.services.map(service => `
+                                        <span class="text-xs px-2 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
+                                            <i class="fas fa-cog mr-1"></i>${service}
+                                        </span>
+                                    `).join('')}
+                                    ${port.repos.map(repo => `
+                                        <span class="text-xs px-2 py-1 bg-purple-100 text-purple-800 rounded-full font-medium">
+                                            <i class="fab fa-git-alt mr-1"></i>${repo}
+                                        </span>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center space-x-2">
+                                <a 
+                                    href="http://localhost:${port.port}" 
+                                    target="_blank"
+                                    class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 transition duration-300"
+                                    title="Open in browser"
+                                >
+                                    <i class="fas fa-external-link-alt mr-1"></i>Open
+                                </a>
+                            </div>
+                        </div>
+                        
+                        <!-- Process List -->
+                        <div class="space-y-2">
+                            ${port.processes.map((proc, index) => `
+                                <div class="flex items-center justify-between p-3 ${index > 0 ? 'border-t border-gray-200' : ''} ${multipleProcesses ? 'bg-white rounded' : 'bg-gray-50 rounded'}">
+                                    <div class="flex-1">
+                                        <div class="flex items-center space-x-2 mb-1">
+                                            <h5 class="font-medium text-gray-900">${proc.process_name}</h5>
+                                            <span class="text-xs text-gray-500">PID: ${proc.pid}</span>
+                                            <span class="text-xs text-gray-400">${proc.address}</span>
+                                            <span class="text-xs px-2 py-1 bg-green-100 text-green-700 rounded font-medium">${proc.service}</span>
+                                            <span class="text-xs px-2 py-1 bg-indigo-100 text-indigo-700 rounded font-medium">${proc.repo}</span>
+                                        </div>
+                                        <p class="text-sm text-gray-600">${proc.command}</p>
+                                    </div>
+                                    
+                                    <div class="flex space-x-1">
+                                        <button 
+                                            class="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition duration-300"
+                                            onclick="stopService('${proc.service}', '${proc.repo}')"
+                                            title="Stop all ${proc.service} processes"
+                                        >
+                                            <i class="fas fa-stop mr-1"></i>Stop
+                                        </button>
+                                        <button 
+                                            class="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition duration-300"
+                                            onclick="startService('${proc.service}', '${proc.repo}')"
+                                            title="Start ${proc.service}"
+                                        >
+                                            <i class="fas fa-play mr-1"></i>Start
+                                        </button>
+                                        <button 
+                                            class="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 transition duration-300"
+                                            onclick="viewServiceLogs('${proc.service}', '${proc.repo}')"
+                                            title="View logs for ${proc.service}"
+                                        >
+                                            <i class="fas fa-file-alt mr-1"></i>Logs
+                                        </button>
+                                        <button 
+                                            class="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700 transition duration-300"
+                                            onclick="killProcess(${proc.pid}, '${proc.process_name}')"
+                                            title="Kill this specific process"
+                                        >
+                                            <i class="fas fa-times mr-1"></i>Kill
+                                        </button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+                }).join('');
+
+                container.innerHTML = portsHtml;
+            }
+
+            async killProcess(pid, name) {
+                if (!confirm(`Are you sure you want to kill "${name}" (PID: ${pid})?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/kill/${pid}`, {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showToast(`Successfully killed ${name} (${pid})`, 'success');
+                        setTimeout(() => this.loadProcesses(), 1000);
+                    } else {
+                        this.showToast(result.error, 'error');
+                    }
+                    
+                } catch (error) {
+                    this.showToast('Failed to kill process', 'error');
+                    console.error('Kill process error:', error);
+                }
+            }
+
+            async restartProcess(pid, name) {
+                if (!confirm(`Are you sure you want to restart "${name}" (PID: ${pid})?\n\nThis will kill the process and start it again with the same command.`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch(`/api/restart/${pid}`, {
+                        method: 'POST'
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showToast(`Successfully restarted ${name} (new PID: ${result.new_pid})`, 'success');
+                        setTimeout(() => this.loadProcesses(), 2000); // Wait a bit longer for restart
+                    } else {
+                        if (result.killed) {
+                            this.showToast(`Killed ${name} but failed to restart: ${result.error}`, 'warning');
+                        } else {
+                            this.showToast(result.error, 'error');
+                        }
+                    }
+                    
+                } catch (error) {
+                    this.showToast('Failed to restart process', 'error');
+                    console.error('Restart process error:', error);
+                }
+            }
+
+            async killCategory(category) {
+                if (!confirm(`Are you sure you want to kill ALL processes in category "${category}"?`)) {
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/kill-category', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ category })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showToast(result.message, 'success');
+                        setTimeout(() => this.loadProcesses(), 1000);
+                    } else {
+                        this.showToast(result.error, 'error');
+                    }
+                    
+                } catch (error) {
+                    this.showToast('Failed to kill category', 'error');
+                    console.error('Kill category error:', error);
+                }
+            }
+
+            toggleAutoRefresh() {
+                autoRefreshEnabled = !autoRefreshEnabled;
+                const statusEl = document.getElementById('auto-status');
+                const btnEl = document.getElementById('auto-refresh-btn');
+                
+                if (autoRefreshEnabled) {
+                    statusEl.textContent = 'ON';
+                    btnEl.classList.add('auto-refresh');
+                    this.startAutoRefresh();
+                } else {
+                    statusEl.textContent = 'OFF';
+                    btnEl.classList.remove('auto-refresh');
+                    this.stopAutoRefresh();
+                }
+            }
+
+            startAutoRefresh() {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                }
+                
+                autoRefreshInterval = setInterval(() => {
+                    this.loadProcesses();
+                }, 5000);
+            }
+
+            stopAutoRefresh() {
+                if (autoRefreshInterval) {
+                    clearInterval(autoRefreshInterval);
+                    autoRefreshInterval = null;
+                }
+            }
+
+            showToast(message, type = 'info') {
+                const toastContainer = document.getElementById('toast-container');
+                const toast = document.createElement('div');
+                
+                const bgColor = type === 'success' ? 'bg-green-600' : 
+                               type === 'error' ? 'bg-red-600' : 
+                               type === 'warning' ? 'bg-orange-600' :
+                               type === 'info' ? 'bg-blue-600' : 'bg-gray-600';
+                
+                toast.className = `${bgColor} text-white px-4 py-2 rounded-md shadow-lg transform transition-transform duration-300 translate-x-full`;
+                const icon = type === 'success' ? 'check' : 
+                            type === 'error' ? 'exclamation-triangle' : 
+                            type === 'warning' ? 'exclamation-triangle' :
+                            type === 'info' ? 'info-circle' : 'bell';
+                
+                toast.innerHTML = `
+                    <div class="flex items-center space-x-2">
+                        <i class="fas fa-${icon}"></i>
+                        <span>${message}</span>
+                        <button onclick="this.parentElement.parentElement.remove()" class="ml-2 hover:bg-white hover:bg-opacity-20 rounded px-1">×</button>
+                    </div>
+                `;
+                
+                toastContainer.appendChild(toast);
+                
+                // Animate in
+                setTimeout(() => toast.classList.remove('translate-x-full'), 100);
+                
+                // Auto remove after 5 seconds
+                setTimeout(() => {
+                    if (toast.parentElement) {
+                        toast.classList.add('translate-x-full');
+                        setTimeout(() => toast.remove(), 300);
+                    }
+                }, 5000);
+            }
+
+            canManageService(service, repos) {
+                // Define which services we can start/stop in which repos
+                const manageable = {
+                    'Laravel Dev': ['atari-agreements'],
+                    'Next.js Dev': ['atari-agreements', 'portfolio-3d'],
+                    'Current Demo': ['crawl-poc'],
+                    'Process Monitor': ['crawl-poc']
+                };
+                
+                return manageable[service] && repos.some(repo => manageable[service].includes(repo));
+            }
+
+            async stopService(service, repo) {
+                if (!confirm(`Stop all ${service} processes in ${repo}?`)) return;
+                
+                try {
+                    const response = await fetch('/api/stop-service', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ service, repo })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showToast(result.message, 'success');
+                        setTimeout(() => this.loadPorts(), 2000);
+                    } else {
+                        this.showToast(result.error, 'warning');
+                    }
+                } catch (error) {
+                    this.showToast('Failed to stop service', 'error');
+                }
+            }
+
+            async startService(service, repo) {
+                try {
+                    const response = await fetch('/api/start-service', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ service, repo })
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.showToast(result.message, 'success');
+                        setTimeout(() => this.loadPorts(), 3000);
+                    } else {
+                        if (result.suggestion) {
+                            this.showToast(`${result.error} - ${result.suggestion}`, 'info');
+                        } else {
+                            this.showToast(result.error, 'warning');
+                        }
+                    }
+                } catch (error) {
+                    this.showToast('Failed to start service', 'error');
+                }
+            }
+
+            updateTimestamp(timestamp) {
+                const date = new Date(timestamp);
+                document.title = `Process Monitor - ${date.toLocaleTimeString()}`;
+            }
+
+            setupLogViewer() {
+                const logServiceFilter = document.getElementById('log-service-filter');
+                if (logServiceFilter) {
+                    logServiceFilter.addEventListener('change', () => {
+                        if (logServiceFilter.value) {
+                            this.loadServiceLogs(logServiceFilter.value);
+                        } else {
+                            this.clearLogViewer();
+                        }
+                    });
+                }
+            }
+
+            async loadLogs() {
+                try {
+                    // Get available services that have logs
+                    const response = await fetch('/api/logs/services');
+                    const data = await response.json();
+                    
+                    this.updateLogServiceDropdown(data.services);
+                    
+                } catch (error) {
+                    console.error('Failed to load log services:', error);
+                    this.showToast('Failed to load log services', 'error');
+                }
+            }
+
+            updateLogServiceDropdown(services) {
+                const logServiceFilter = document.getElementById('log-service-filter');
+                if (!logServiceFilter) return;
+                
+                // Clear existing options except the first one
+                logServiceFilter.innerHTML = '<option value="">Select Service</option>';
+                
+                // Add service options
+                services.forEach(service => {
+                    const option = document.createElement('option');
+                    option.value = service.id;
+                    option.textContent = `${service.name} (${service.repo})`;
+                    logServiceFilter.appendChild(option);
+                });
+            }
+
+            async loadServiceLogs(serviceId) {
+                try {
+                    const response = await fetch(`/api/logs/${serviceId}`);
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.displayLogs(data.logs);
+                    } else {
+                        this.displayLogs([`Error: ${data.error}`]);
+                    }
+                    
+                } catch (error) {
+                    console.error('Failed to load service logs:', error);
+                    this.displayLogs([`Error: Failed to load logs - ${error.message}`]);
+                }
+            }
+
+            displayLogs(logs) {
+                const logViewer = document.getElementById('log-viewer');
+                if (!logViewer) return;
+                
+                if (logs.length === 0) {
+                    logViewer.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-file-alt text-2xl mb-2"></i>
+                            <p>No logs available for this service</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                const logsHtml = logs.map(line => {
+                    // Color code different types of log messages
+                    let className = 'text-green-400';
+                    if (line.includes('ERROR') || line.includes('error')) {
+                        className = 'text-red-400';
+                    } else if (line.includes('WARN') || line.includes('warning')) {
+                        className = 'text-yellow-400';
+                    } else if (line.includes('INFO') || line.includes('info')) {
+                        className = 'text-blue-400';
+                    }
+                    
+                    return `<div class="${className}">${this.escapeHtml(line)}</div>`;
+                }).join('');
+                
+                logViewer.innerHTML = logsHtml;
+                
+                // Auto-scroll to bottom
+                logViewer.scrollTop = logViewer.scrollHeight;
+            }
+
+            clearLogViewer() {
+                const logViewer = document.getElementById('log-viewer');
+                const logServiceFilter = document.getElementById('log-service-filter');
+                
+                if (logViewer) {
+                    logViewer.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <i class="fas fa-file-alt text-2xl mb-2"></i>
+                            <p>Select a service to view its logs</p>
+                        </div>
+                    `;
+                }
+                
+                if (logServiceFilter) {
+                    logServiceFilter.value = '';
+                }
+            }
+
+            escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+
+            slugify(text) {
+                return text.toLowerCase()
+                    .replace(/[^\w\s-]/g, '')
+                    .replace(/[\s_-]+/g, '-')
+                    .replace(/^-+|-+$/g, '');
+            }
+        }
+
+        // Global functions for onclick handlers
+        function loadProcesses() {
+            monitor.loadProcesses();
+        }
+
+        function killProcess(pid, name) {
+            monitor.killProcess(pid, name);
+        }
+
+        function restartProcess(pid, name) {
+            monitor.restartProcess(pid, name);
+        }
+
+        function killCategory(category) {
+            monitor.killCategory(category);
+        }
+
+        function toggleAutoRefresh() {
+            monitor.toggleAutoRefresh();
+        }
+
+        function clearPortFilters() {
+            const serviceFilter = document.getElementById('service-filter');
+            const repoFilter = document.getElementById('repo-filter');
+            
+            if (serviceFilter) serviceFilter.value = '';
+            if (repoFilter) repoFilter.value = '';
+            
+            if (monitor) {
+                monitor.applyPortFilters();
+            }
+        }
+
+        function refreshLogs() {
+            const logServiceFilter = document.getElementById('log-service-filter');
+            if (logServiceFilter && logServiceFilter.value) {
+                monitor.loadServiceLogs(logServiceFilter.value);
+            } else {
+                monitor.loadLogs();
+            }
+        }
+
+        function clearLogViewer() {
+            monitor.clearLogViewer();
+        }
+
+        function viewServiceLogs(service, repo) {
+            // Switch to logs tab
+            switchTab('logs');
+            
+            // Find matching service in the dropdown and select it
+            setTimeout(() => {
+                const logServiceFilter = document.getElementById('log-service-filter');
+                if (logServiceFilter) {
+                    // Try to find a matching service option
+                    for (let option of logServiceFilter.options) {
+                        if (option.textContent.includes(service) || option.textContent.includes(repo)) {
+                            logServiceFilter.value = option.value;
+                            logServiceFilter.dispatchEvent(new Event('change'));
+                            break;
+                        }
+                    }
+                }
+            }, 500); // Give time for the logs tab to load
+        }
+
+        function stopService(service, repo) {
+            monitor.stopService(service, repo);
+        }
+
+        function startService(service, repo) {
+            monitor.startService(service, repo);
+        }
+
+        function startSelectedService() {
+            const quickStart = document.getElementById('quick-start');
+            const selected = quickStart.value;
+            
+            if (!selected) {
+                alert('Please select a service to start');
+                return;
+            }
+            
+            const [service, repo] = selected.split('|');
+            startService(service, repo);
+            quickStart.value = ''; // Reset selection
+        }
+
+        function toggleTabCollapse(tabName) {
+            const tab = document.getElementById(`tab-${tabName}`);
+            const icon = tab.querySelector('.collapse-icon i');
+            
+            tab.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+            
+            // Update icon direction
+            if (tab.classList.contains('collapsed')) {
+                icon.classList.remove('fa-chevron-down');
+                icon.classList.add('fa-chevron-right');
+            } else {
+                icon.classList.remove('fa-chevron-right');
+                icon.classList.add('fa-chevron-down');
+            }
+            
+            // Save collapse state
+            localStorage.setItem(`tab-${tabName}-collapsed`, tab.classList.contains('collapsed'));
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            
+            // Load content for the active tab
+            if (tabName === 'processes') {
+                monitor.loadProcesses();
+            } else if (tabName === 'ports') {
+                monitor.loadPorts();
+            } else if (tabName === 'logs') {
+                monitor.loadLogs();
+            }
+        }
+
+        // Initialize when page loads
+        let monitor;
+        document.addEventListener('DOMContentLoaded', () => {
+            monitor = new ProcessMonitor();
+            
+            // Restore saved collapse states
+            ['ports', 'processes', 'logs'].forEach(tabName => {
+                const isCollapsed = localStorage.getItem(`tab-${tabName}-collapsed`) === 'true';
+                if (isCollapsed) {
+                    const tab = document.getElementById(`tab-${tabName}`);
+                    const icon = tab.querySelector('.collapse-icon i');
+                    
+                    tab.classList.add('collapsed');
+                    icon.classList.add('collapsed');
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-right');
+                }
+            });
+        });
+    </script>
+</body>
+</html>

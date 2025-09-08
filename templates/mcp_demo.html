@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP-Integrated Crawl4AI Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-7xl mx-auto p-6">
+        <!-- Header -->
+        <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg p-6 mb-6 text-white">
+            <h1 class="text-3xl font-bold mb-2">
+                <i class="fas fa-robot mr-3"></i>
+                MCP-Integrated Crawl4AI Demo
+            </h1>
+            <p class="text-blue-100">Real browser automation using Claude's MCP Playwright tools</p>
+        </div>
+
+        <!-- Authentication Form -->
+        <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-lock mr-2 text-blue-600"></i>
+                Authenticated Crawling
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Login URL</label>
+                    <input type="url" id="login-url" 
+                           value="http://18.118.164.40/login"
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="https://example.com/login">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Target URL (optional)</label>
+                    <input type="url" id="target-url"
+                           value="http://18.118.164.40/dashboard" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="https://example.com/dashboard">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                    <input type="text" id="username"
+                           value="" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="Enter username">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="password"
+                           value="" 
+                           class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500" 
+                           placeholder="Enter password">
+                </div>
+            </div>
+
+            <button onclick="runAuthenticatedCrawl()" 
+                    class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md transition-colors">
+                <i class="fas fa-play mr-2"></i>
+                Start MCP Authenticated Crawling
+            </button>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="hidden bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <div class="flex items-center">
+                <i class="fas fa-spinner fa-spin text-blue-600 mr-3"></i>
+                <span class="text-blue-800">Processing with MCP browser automation...</span>
+            </div>
+        </div>
+
+        <!-- Results -->
+        <div id="results" class="hidden bg-white rounded-lg shadow-lg p-6">
+            <h2 class="text-xl font-semibold mb-4">
+                <i class="fas fa-chart-bar mr-2 text-green-600"></i>
+                Extracted Results
+            </h2>
+
+            <!-- Summary Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <div class="text-2xl font-bold text-blue-600" id="content-length">-</div>
+                    <div class="text-sm text-blue-800">Characters</div>
+                </div>
+                <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+                    <div class="text-2xl font-bold text-green-600" id="word-count">-</div>
+                    <div class="text-sm text-green-800">Words</div>
+                </div>
+                <div class="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                    <div class="text-2xl font-bold text-purple-600" id="entities-found">-</div>
+                    <div class="text-sm text-purple-800">Data Points</div>
+                </div>
+                <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                    <div class="text-2xl font-bold text-yellow-600" id="auth-status">-</div>
+                    <div class="text-sm text-yellow-800">Authenticated</div>
+                </div>
+            </div>
+
+            <!-- Tabs -->
+            <div class="border-b border-gray-200 mb-4">
+                <nav class="flex space-x-8">
+                    <button onclick="showTab('content')" 
+                            class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-blue-500 text-blue-600" 
+                            data-tab="content">
+                        Content
+                    </button>
+                    <button onclick="showTab('data')" 
+                            class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                            data-tab="data">
+                        Extracted Data
+                    </button>
+                    <button onclick="showTab('mcp')" 
+                            class="tab-btn py-2 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700" 
+                            data-tab="mcp">
+                        MCP Actions
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Tab Content -->
+            <div id="tab-content" class="tab-content">
+                <pre id="content-display" class="bg-gray-50 p-4 rounded-lg text-sm overflow-auto max-h-96 whitespace-pre-wrap"></pre>
+            </div>
+            
+            <div id="tab-data" class="tab-content hidden">
+                <div id="data-display" class="space-y-4"></div>
+            </div>
+            
+            <div id="tab-mcp" class="tab-content hidden">
+                <div id="mcp-display" class="space-y-3"></div>
+            </div>
+        </div>
+
+        <!-- Status -->
+        <div class="mt-6 text-center text-sm text-gray-500">
+            <i class="fas fa-info-circle mr-1"></i>
+            Status: <span id="status">Ready</span>
+        </div>
+    </div>
+
+    <script>
+        async function runAuthenticatedCrawl() {
+            const loginUrl = document.getElementById('login-url').value;
+            const targetUrl = document.getElementById('target-url').value;
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            if (!loginUrl || !username || !password) {
+                alert('Please fill in login URL, username, and password');
+                return;
+            }
+
+            document.getElementById('loading').classList.remove('hidden');
+            document.getElementById('results').classList.add('hidden');
+            document.getElementById('status').textContent = 'Authenticating...';
+
+            try {
+                const response = await fetch('/api/auth-crawl-mcp', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        login_url: loginUrl,
+                        target_url: targetUrl || loginUrl,
+                        username: username,
+                        password: password
+                    })
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                    displayResults(result);
+                    document.getElementById('status').textContent = 'Extraction completed';
+                } else {
+                    alert('Error: ' + result.error);
+                    document.getElementById('status').textContent = 'Error occurred';
+                }
+            } catch (error) {
+                alert('Request failed: ' + error.message);
+                document.getElementById('status').textContent = 'Request failed';
+            } finally {
+                document.getElementById('loading').classList.add('hidden');
+            }
+        }
+
+        function displayResults(result) {
+            // Update summary
+            document.getElementById('content-length').textContent = result.summary.content_length.toLocaleString();
+            document.getElementById('word-count').textContent = result.summary.word_count.toLocaleString();
+            document.getElementById('entities-found').textContent = result.summary.entities_found;
+            document.getElementById('auth-status').textContent = result.summary.authenticated ? '✓' : '✗';
+
+            // Show content
+            document.getElementById('content-display').textContent = result.extraction.content;
+
+            // Show extracted data
+            const dataDisplay = document.getElementById('data-display');
+            dataDisplay.innerHTML = '';
+            
+            Object.entries(result.processed_data).forEach(([key, values]) => {
+                if (values.length > 0) {
+                    const div = document.createElement('div');
+                    div.className = 'bg-gray-50 p-4 rounded-lg';
+                    div.innerHTML = `
+                        <h4 class="font-semibold text-gray-800 mb-2 capitalize">${key.replace('_', ' ')}</h4>
+                        <div class="flex flex-wrap gap-2">
+                            ${values.map(v => `<span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">${v}</span>`).join('')}
+                        </div>
+                    `;
+                    dataDisplay.appendChild(div);
+                }
+            });
+
+            // Show MCP actions
+            const mcpDisplay = document.getElementById('mcp-display');
+            mcpDisplay.innerHTML = '';
+            
+            result.mcp_actions.forEach(action => {
+                const div = document.createElement('div');
+                div.className = 'bg-gray-50 border-l-4 border-blue-500 p-4 rounded-r-lg';
+                div.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <div class="font-medium text-gray-800">${action.action}</div>
+                        <div class="text-sm text-gray-500">${action.status}</div>
+                    </div>
+                    ${action.url ? `<div class="text-sm text-gray-600 mt-1">${action.url}</div>` : ''}
+                    ${action.method ? `<div class="text-sm text-blue-600 mt-1">Method: ${action.method}</div>` : ''}
+                    ${action.metrics_extracted ? `<div class="text-sm text-green-600 mt-1">Metrics extracted: ${action.metrics_extracted}</div>` : ''}
+                `;
+                mcpDisplay.appendChild(div);
+            });
+
+            document.getElementById('results').classList.remove('hidden');
+        }
+
+        function showTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            
+            // Show selected tab
+            document.getElementById('tab-' + tabName).classList.remove('hidden');
+            
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('border-blue-500', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('border-blue-500', 'text-blue-600');
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            showTab('content');
+            document.getElementById('status').textContent = 'Ready - MCP Integration Active';
+        });
+    </script>
+</body>
+</html>
